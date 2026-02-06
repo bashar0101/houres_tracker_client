@@ -82,12 +82,53 @@ const ManagerDashboard = () => {
       }
   };
 
+  const updateSalary = async (userId, hourlyRate) => {
+      try {
+          await axios.put(`http://localhost:5000/api/manager/users/${userId}/salary`, { hourlyRate });
+          fetchUsers(); // Refresh list
+          alert('Salary updated');
+      } catch (err) {
+          console.error(err);
+          alert('Failed to update salary');
+      }
+  };
+
+  const downloadReport = async (userId, username) => {
+      const month = prompt("Enter Month (1-12):", new Date().getMonth() + 1);
+      const year = prompt("Enter Year:", new Date().getFullYear());
+      
+      if (!month || !year) return;
+
+      try {
+          const res = await axios.get(`http://localhost:5000/api/manager/users/${userId}/report?month=${month}&year=${year}`, {
+              responseType: 'blob'
+          });
+          
+          const url = window.URL.createObjectURL(new Blob([res.data]));
+          const link = document.createElement('a');
+          link.href = url;
+          link.setAttribute('download', `report-${username}-${month}-${year}.pdf`);
+          document.body.appendChild(link);
+          link.click();
+          link.remove();
+      } catch (err) {
+          console.error(err);
+          alert('Failed to generate report');
+      }
+  };
+
   const formatTime = (ms) => {
     if (!ms) return '-';
     const seconds = Math.floor((ms / 1000) % 60);
     const minutes = Math.floor((ms / (1000 * 60)) % 60);
     const hours = Math.floor((ms / (1000 * 60 * 60)));
     return `${hours}h ${minutes}m ${seconds}s`;
+  };
+
+  const calculateEarnings = (durationMs, hourlyRate) => {
+      if (!durationMs || !hourlyRate) return '$0.00';
+      const hours = durationMs / (1000 * 60 * 60);
+      return `$${(hours * hourlyRate).toFixed(2)}`;
   };
 
   if (loading) return <div>Loading...</div>;
@@ -110,7 +151,7 @@ const ManagerDashboard = () => {
                 className={`nav-btn ${view === 'users' ? 'active' : ''}`}
                 style={view === 'users' ? {background: 'var(--primary-color)', color: 'white'} : {}}
             >
-                Manage Users
+                Manage Employees
             </button>
             <button 
                 onClick={() => setView('requests')}
@@ -139,6 +180,7 @@ const ManagerDashboard = () => {
                             <th>Start Time</th>
                             <th>End Time</th>
                             <th>Duration</th>
+                            <th>Earnings</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -163,10 +205,13 @@ const ManagerDashboard = () => {
                                     {item.endTime ? new Date(item.endTime).toLocaleTimeString() : <span style={{color: 'var(--success-color)'}}>Active</span>}
                                 </td>
                                 <td>{item.duration ? formatTime(item.duration) : '-'}</td>
+                                <td style={{color: 'var(--success-color)', fontWeight: 'bold'}}>
+                                    {calculateEarnings(item.duration, item.userId?.hourlyRate)}
+                                </td>
                             </tr>
                         )) : (
                             <tr>
-                                <td colSpan="6" style={{textAlign: 'center', color: 'var(--text-secondary)'}}>No work records found</td>
+                                <td colSpan="7" style={{textAlign: 'center', color: 'var(--text-secondary)'}}>No work records found</td>
                             </tr>
                         )}
                     </tbody>
@@ -180,8 +225,9 @@ const ManagerDashboard = () => {
                     <thead>
                         <tr>
                             <th>Username</th>
-                            <th>Current Role</th>
-                            <th>Action</th>
+                            <th>Role</th>
+                            <th>Hourly Rate ($)</th>
+                            <th>Actions</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -201,21 +247,52 @@ const ManagerDashboard = () => {
                                     </span>
                                 </td>
                                 <td>
-                                    {u._id !== user.id && (
+                                    {u.role !== 'manager' ? (
+                                        <input 
+                                            type="number" 
+                                            defaultValue={u.hourlyRate || 0}
+                                            onBlur={(e) => updateSalary(u._id, e.target.value)}
+                                            style={{
+                                                background: 'transparent', 
+                                                border: '1px solid var(--glass-border)', 
+                                                color: 'white', 
+                                                padding: '4px', 
+                                                width: '80px'
+                                            }}
+                                        />
+                                    ) : '-'}
+                                </td>
+                                <td>
+                                    <div style={{display: 'flex', gap: '10px'}}>
+                                        {u._id !== user.id && (
+                                            <button 
+                                                onClick={() => toggleRole(u._id, u.role)}
+                                                style={{
+                                                    padding: '6px 12px',
+                                                    borderRadius: '4px',
+                                                    border: '1px solid var(--glass-border)',
+                                                    background: u.role === 'manager' ? 'rgba(239, 68, 68, 0.2)' : 'rgba(34, 197, 94, 0.2)',
+                                                    color: u.role === 'manager' ? 'var(--danger-color)' : 'var(--success-color)',
+                                                    cursor: 'pointer'
+                                                }}
+                                            >
+                                                {u.role === 'manager' ? 'Demote' : 'Promote'}
+                                            </button>
+                                        )}
                                         <button 
-                                            onClick={() => toggleRole(u._id, u.role)}
+                                            onClick={() => downloadReport(u._id, u.username)}
                                             style={{
                                                 padding: '6px 12px',
                                                 borderRadius: '4px',
-                                                border: '1px solid var(--glass-border)',
-                                                background: u.role === 'manager' ? 'rgba(239, 68, 68, 0.2)' : 'rgba(34, 197, 94, 0.2)',
-                                                color: u.role === 'manager' ? 'var(--danger-color)' : 'var(--success-color)',
+                                                border: 'none',
+                                                background: 'var(--primary-color)',
+                                                color: 'white',
                                                 cursor: 'pointer'
                                             }}
                                         >
-                                            {u.role === 'manager' ? 'Demote to Employee' : 'Promote to Manager'}
+                                            Report
                                         </button>
-                                    )}
+                                    </div>
                                 </td>
                             </tr>
                         ))}

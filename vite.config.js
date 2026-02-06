@@ -6,3 +6,4 @@ export default defineConfig({
   plugins: [react()],
   base: '/houres_tracker_client/',
 })
+// save all changes

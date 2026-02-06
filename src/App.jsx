@@ -10,7 +10,7 @@ import { AuthProvider } from './context/AuthContext';
 function App() {
   return (
     <AuthProvider>
-      <Router>
+      <Router basename="/houres_tracker_client">
         <div className="App">
           <Navbar />
           <Routes>

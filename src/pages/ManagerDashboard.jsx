@@ -8,7 +8,8 @@ const ManagerDashboard = () => {
   const navigate = useNavigate();
   const [sessions, setSessions] = useState([]);
   const [users, setUsers] = useState([]);
-  const [view, setView] = useState('work'); // 'work' or 'users'
+  const [requests, setRequests] = useState([]);
+  const [view, setView] = useState('work'); // 'work', 'users', 'requests'
 
   useEffect(() => {
     if (!loading) {
@@ -38,10 +39,20 @@ const ManagerDashboard = () => {
       }
   };
 
+  const fetchRequests = async () => {
+      try {
+          const res = await axios.get('http://localhost:5000/api/manager/requests');
+          setRequests(res.data);
+      } catch (err) {
+          console.error(err);
+      }
+  };
+
   useEffect(() => {
     if (isAuthenticated && user?.role === 'manager') {
         fetchAllWork();
         fetchUsers();
+        fetchRequests();
     }
   }, [isAuthenticated, user]);
 
@@ -60,12 +71,64 @@ const ManagerDashboard = () => {
       }
   };
 
+  const handleRequest = async (userId, status) => {
+      try {
+          await axios.put(`http://localhost:5000/api/manager/requests/${userId}`, { status });
+          fetchRequests(); // Refresh requests
+          fetchUsers(); // Refresh users list
+      } catch (err) {
+          console.error(err);
+          alert('Failed to update request');
+      }
+  };
+
+  const updateSalary = async (userId, hourlyRate) => {
+      try {
+          await axios.put(`http://localhost:5000/api/manager/users/${userId}/salary`, { hourlyRate });
+          fetchUsers(); // Refresh list
+          alert('Salary updated');
+      } catch (err) {
+          console.error(err);
+          alert('Failed to update salary');
+      }
+  };
+
+  const downloadReport = async (userId, username) => {
+      const month = prompt("Enter Month (1-12):", new Date().getMonth() + 1);
+      const year = prompt("Enter Year:", new Date().getFullYear());
+      
+      if (!month || !year) return;
+
+      try {
+          const res = await axios.get(`http://localhost:5000/api/manager/users/${userId}/report?month=${month}&year=${year}`, {
+              responseType: 'blob'
+          });
+          
+          const url = window.URL.createObjectURL(new Blob([res.data]));
+          const link = document.createElement('a');
+          link.href = url;
+          link.setAttribute('download', `report-${username}-${month}-${year}.pdf`);
+          document.body.appendChild(link);
+          link.click();
+          link.remove();
+      } catch (err) {
+          console.error(err);
+          alert('Failed to generate report');
+      }
+  };
+
   const formatTime = (ms) => {
     if (!ms) return '-';
     const seconds = Math.floor((ms / 1000) % 60);
     const minutes = Math.floor((ms / (1000 * 60)) % 60);
     const hours = Math.floor((ms / (1000 * 60 * 60)));
     return `${hours}h ${minutes}m ${seconds}s`;
+  };
+
+  const calculateEarnings = (durationMs, hourlyRate) => {
+      if (!durationMs || !hourlyRate) return '$0.00';
+      const hours = durationMs / (1000 * 60 * 60);
+      return `$${(hours * hourlyRate).toFixed(2)}`;
   };
 
   if (loading) return <div>Loading...</div>;
@@ -88,13 +151,25 @@ const ManagerDashboard = () => {
                 className={`nav-btn ${view === 'users' ? 'active' : ''}`}
                 style={view === 'users' ? {background: 'var(--primary-color)', color: 'white'} : {}}
             >
-                Manage Users
+                Manage Employees
+            </button>
+            <button 
+                onClick={() => setView('requests')}
+                className={`nav-btn ${view === 'requests' ? 'active' : ''}`}
+                style={view === 'requests' ? {background: 'var(--primary-color)', color: 'white'} : {position: 'relative'}}
+            >
+                Requests
+                {requests.length > 0 && <span style={{
+                    position: 'absolute', top: '-5px', right: '-5px', 
+                    background: 'red', color: 'white', borderRadius: '50%', 
+                    padding: '2px 6px', fontSize: '0.7rem'
+                }}>{requests.length}</span>}
             </button>
         </div>
       </div>
 
       <div className="history-section" style={{marginTop: '2rem'}}>
-        {view === 'work' ? (
+        {view === 'work' && (
             <div className="history-table-container">
                 <table className="history-table">
                     <thead>
@@ -105,6 +180,7 @@ const ManagerDashboard = () => {
                             <th>Start Time</th>
                             <th>End Time</th>
                             <th>Duration</th>
+                            <th>Earnings</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -129,23 +205,29 @@ const ManagerDashboard = () => {
                                     {item.endTime ? new Date(item.endTime).toLocaleTimeString() : <span style={{color: 'var(--success-color)'}}>Active</span>}
                                 </td>
                                 <td>{item.duration ? formatTime(item.duration) : '-'}</td>
+                                <td style={{color: 'var(--success-color)', fontWeight: 'bold'}}>
+                                    {calculateEarnings(item.duration, item.userId?.hourlyRate)}
+                                </td>
                             </tr>
                         )) : (
                             <tr>
-                                <td colSpan="6" style={{textAlign: 'center', color: 'var(--text-secondary)'}}>No work records found</td>
+                                <td colSpan="7" style={{textAlign: 'center', color: 'var(--text-secondary)'}}>No work records found</td>
                             </tr>
                         )}
                     </tbody>
                 </table>
             </div>
-        ) : (
+        )}
+
+        {view === 'users' && (
             <div className="history-table-container">
                 <table className="history-table">
                     <thead>
                         <tr>
                             <th>Username</th>
-                            <th>Current Role</th>
-                            <th>Action</th>
+                            <th>Role</th>
+                            <th>Hourly Rate ($)</th>
+                            <th>Actions</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -165,24 +247,112 @@ const ManagerDashboard = () => {
                                     </span>
                                 </td>
                                 <td>
-                                    {u._id !== user.id && (
+                                    {u.role !== 'manager' ? (
+                                        <input 
+                                            type="number" 
+                                            defaultValue={u.hourlyRate || 0}
+                                            onBlur={(e) => updateSalary(u._id, e.target.value)}
+                                            style={{
+                                                background: 'transparent', 
+                                                border: '1px solid var(--glass-border)', 
+                                                color: 'white', 
+                                                padding: '4px', 
+                                                width: '80px'
+                                            }}
+                                        />
+                                    ) : '-'}
+                                </td>
+                                <td>
+                                    <div style={{display: 'flex', gap: '10px'}}>
+                                        {u._id !== user.id && (
+                                            <button 
+                                                onClick={() => toggleRole(u._id, u.role)}
+                                                style={{
+                                                    padding: '6px 12px',
+                                                    borderRadius: '4px',
+                                                    border: '1px solid var(--glass-border)',
+                                                    background: u.role === 'manager' ? 'rgba(239, 68, 68, 0.2)' : 'rgba(34, 197, 94, 0.2)',
+                                                    color: u.role === 'manager' ? 'var(--danger-color)' : 'var(--success-color)',
+                                                    cursor: 'pointer'
+                                                }}
+                                            >
+                                                {u.role === 'manager' ? 'Demote' : 'Promote'}
+                                            </button>
+                                        )}
                                         <button 
-                                            onClick={() => toggleRole(u._id, u.role)}
+                                            onClick={() => downloadReport(u._id, u.username)}
                                             style={{
                                                 padding: '6px 12px',
                                                 borderRadius: '4px',
-                                                border: '1px solid var(--glass-border)',
-                                                background: u.role === 'manager' ? 'rgba(239, 68, 68, 0.2)' : 'rgba(34, 197, 94, 0.2)',
-                                                color: u.role === 'manager' ? 'var(--danger-color)' : 'var(--success-color)',
+                                                border: 'none',
+                                                background: 'var(--primary-color)',
+                                                color: 'white',
                                                 cursor: 'pointer'
                                             }}
                                         >
-                                            {u.role === 'manager' ? 'Demote to Employee' : 'Promote to Manager'}
+                                            Report
                                         </button>
-                                    )}
+                                    </div>
                                 </td>
                             </tr>
                         ))}
+                    </tbody>
+                </table>
+            </div>
+        )}
+
+        {view === 'requests' && (
+             <div className="history-table-container">
+                <table className="history-table">
+                    <thead>
+                        <tr>
+                            <th>Username</th>
+                            <th>Requested On</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {requests.length > 0 ? requests.map(u => (
+                            <tr key={u._id}>
+                                <td style={{fontWeight: 'bold', color: 'var(--text-primary)'}}>
+                                    {u.username}
+                                </td>
+                                <td>{new Date().toLocaleDateString()}</td> 
+                                <td>
+                                    <button 
+                                        onClick={() => handleRequest(u._id, 'active')}
+                                        style={{
+                                            padding: '6px 12px',
+                                            borderRadius: '4px',
+                                            border: 'none',
+                                            background: 'var(--success-color)',
+                                            color: 'white',
+                                            cursor: 'pointer',
+                                            marginRight: '10px'
+                                        }}
+                                    >
+                                        Approve
+                                    </button>
+                                    <button 
+                                        onClick={() => handleRequest(u._id, 'rejected')}
+                                        style={{
+                                            padding: '6px 12px',
+                                            borderRadius: '4px',
+                                            border: '1px solid var(--glass-border)',
+                                            background: 'rgba(239, 68, 68, 0.2)',
+                                            color: 'var(--danger-color)',
+                                            cursor: 'pointer'
+                                        }}
+                                    >
+                                        Reject
+                                    </button>
+                                </td>
+                            </tr>
+                        )) : (
+                            <tr>
+                                <td colSpan="3" style={{textAlign: 'center', color: 'var(--text-secondary)'}}>No pending requests</td>
+                            </tr>
+                        )}
                     </tbody>
                 </table>
             </div>

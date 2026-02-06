@@ -17,11 +17,11 @@ const Login = () => {
 
   const onSubmit = async e => {
     e.preventDefault();
-    const success = await login(username, password);
-    if (success) {
+    const result = await login(username, password);
+    if (result.success) {
         navigate('/');
     } else {
-        alert('Login failed');
+        alert(result.msg || 'Login failed');
     }
   };
 

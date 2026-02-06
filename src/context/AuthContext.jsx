@@ -45,16 +45,22 @@ export const AuthProvider = ({ children }) => {
       setUser({ ...payload.user, role: res.data.role }); 
       
       setIsAuthenticated(true);
-      return true;
+      return { success: true };
     } catch (err) {
       console.error(err.response.data);
-      return false;
+      return { success: false, msg: err.response.data.msg };
     }
   };
 
-  const register = async (username, password) => {
+  const register = async (username, password, type, companyName, companyId) => {
     try {
-      const res = await axios.post('http://localhost:5000/api/auth/register', { username, password });
+      const res = await axios.post('http://localhost:5000/api/auth/register', { username, password, type, companyName, companyId });
+      
+      // If pending, user is not logged in automatically
+      if (res.data.status === 'pending') {
+          return true; // Return success to redirect to login
+      }
+
       localStorage.setItem('token', res.data.token);
       axios.defaults.headers.common['x-auth-token'] = res.data.token;
       

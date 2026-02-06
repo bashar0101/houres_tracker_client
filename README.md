@@ -1,16 +1,62 @@
-# React + Vite
+# Hours Calculator App
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A full-stack application to track working hours, built with React (Frontend) and Node.js/Express (Backend).
 
-Currently, two official plugins are available:
+## Prerequisites
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- Node.js installed
+- MongoDB installed and running locally
 
-## React Compiler
+## Getting Started
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+### 1. Setup Backend (Server)
 
-## Expanding the ESLint configuration
+1. Navigate to the server directory:
+   ```bash
+   cd server
+   ```
+2. Install dependencies:
+   ```bash
+   npm install
+   ```
+3. Start the server:
+   ```bash
+   npm start
+   ```
+   The server will run on `http://localhost:5000`.
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+### 2. Setup Frontend (Client)
+
+1. Navigate to the client directory:
+   ```bash
+   cd client
+   ```
+2. Install dependencies:
+   ```bash
+   npm install
+   ```
+3. Start the development server:
+   ```bash
+   npm run dev
+   ```
+   Open your browser (usually `http://localhost:5173`).
+
+## Usage
+
+1. Register a new account.
+2. Login.
+3. Click "START WORK" to begin a session.
+4. Click "STOP WORK" to end it.
+5. View your work history in the table below.
+
+## Deployment (GitHub Pages)
+
+To deploy the frontend to GitHub Pages:
+
+1. Ensure your backend is HOSTED somewhere (e.g., Render, Heroku) because GitHub Pages is static only.
+2. Update the API URL in `client/src/context/AuthContext.jsx` and `client/src/pages/Dashboard.jsx` to point to your live backend URL.
+3. In `client/package.json`, update the `homepage` field if necessary.
+4. Run:
+   ```bash
+   npm run deploy
+   ```

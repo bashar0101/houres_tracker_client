@@ -8,7 +8,8 @@ const ManagerDashboard = () => {
   const navigate = useNavigate();
   const [sessions, setSessions] = useState([]);
   const [users, setUsers] = useState([]);
-  const [view, setView] = useState('work'); // 'work' or 'users'
+  const [requests, setRequests] = useState([]);
+  const [view, setView] = useState('work'); // 'work', 'users', 'requests'
 
   useEffect(() => {
     if (!loading) {
@@ -38,10 +39,20 @@ const ManagerDashboard = () => {
       }
   };
 
+  const fetchRequests = async () => {
+      try {
+          const res = await axios.get('http://localhost:5000/api/manager/requests');
+          setRequests(res.data);
+      } catch (err) {
+          console.error(err);
+      }
+  };
+
   useEffect(() => {
     if (isAuthenticated && user?.role === 'manager') {
         fetchAllWork();
         fetchUsers();
+        fetchRequests();
     }
   }, [isAuthenticated, user]);
 
@@ -57,6 +68,17 @@ const ManagerDashboard = () => {
       } catch (err) {
           console.error(err);
           alert('Failed to update role');
+      }
+  };
+
+  const handleRequest = async (userId, status) => {
+      try {
+          await axios.put(`http://localhost:5000/api/manager/requests/${userId}`, { status });
+          fetchRequests(); // Refresh requests
+          fetchUsers(); // Refresh users list
+      } catch (err) {
+          console.error(err);
+          alert('Failed to update request');
       }
   };
 
@@ -90,11 +112,23 @@ const ManagerDashboard = () => {
             >
                 Manage Users
             </button>
+            <button 
+                onClick={() => setView('requests')}
+                className={`nav-btn ${view === 'requests' ? 'active' : ''}`}
+                style={view === 'requests' ? {background: 'var(--primary-color)', color: 'white'} : {position: 'relative'}}
+            >
+                Requests
+                {requests.length > 0 && <span style={{
+                    position: 'absolute', top: '-5px', right: '-5px', 
+                    background: 'red', color: 'white', borderRadius: '50%', 
+                    padding: '2px 6px', fontSize: '0.7rem'
+                }}>{requests.length}</span>}
+            </button>
         </div>
       </div>
 
       <div className="history-section" style={{marginTop: '2rem'}}>
-        {view === 'work' ? (
+        {view === 'work' && (
             <div className="history-table-container">
                 <table className="history-table">
                     <thead>
@@ -138,7 +172,9 @@ const ManagerDashboard = () => {
                     </tbody>
                 </table>
             </div>
-        ) : (
+        )}
+
+        {view === 'users' && (
             <div className="history-table-container">
                 <table className="history-table">
                     <thead>
@@ -183,6 +219,63 @@ const ManagerDashboard = () => {
                                 </td>
                             </tr>
                         ))}
+                    </tbody>
+                </table>
+            </div>
+        )}
+
+        {view === 'requests' && (
+             <div className="history-table-container">
+                <table className="history-table">
+                    <thead>
+                        <tr>
+                            <th>Username</th>
+                            <th>Requested On</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {requests.length > 0 ? requests.map(u => (
+                            <tr key={u._id}>
+                                <td style={{fontWeight: 'bold', color: 'var(--text-primary)'}}>
+                                    {u.username}
+                                </td>
+                                <td>{new Date().toLocaleDateString()}</td> 
+                                <td>
+                                    <button 
+                                        onClick={() => handleRequest(u._id, 'active')}
+                                        style={{
+                                            padding: '6px 12px',
+                                            borderRadius: '4px',
+                                            border: 'none',
+                                            background: 'var(--success-color)',
+                                            color: 'white',
+                                            cursor: 'pointer',
+                                            marginRight: '10px'
+                                        }}
+                                    >
+                                        Approve
+                                    </button>
+                                    <button 
+                                        onClick={() => handleRequest(u._id, 'rejected')}
+                                        style={{
+                                            padding: '6px 12px',
+                                            borderRadius: '4px',
+                                            border: '1px solid var(--glass-border)',
+                                            background: 'rgba(239, 68, 68, 0.2)',
+                                            color: 'var(--danger-color)',
+                                            cursor: 'pointer'
+                                        }}
+                                    >
+                                        Reject
+                                    </button>
+                                </td>
+                            </tr>
+                        )) : (
+                            <tr>
+                                <td colSpan="3" style={{textAlign: 'center', color: 'var(--text-secondary)'}}>No pending requests</td>
+                            </tr>
+                        )}
                     </tbody>
                 </table>
             </div>

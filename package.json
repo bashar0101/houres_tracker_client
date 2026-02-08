@@ -1,6 +1,5 @@
 {
   "name": "client",
-  "homepage": "https://bashar0101.github.io/houres_tracker_client",
   "private": true,
   "version": "0.0.0",
   "type": "module",
